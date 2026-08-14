@@ -11,8 +11,7 @@
  * uploads.github.com (large transfers may be interrupted on some networks;
  * retry or use a proxy in that case).
  */
-import { createReadStream, readFileSync, readdirSync, statSync } from 'node:fs'
-import { Readable } from 'node:stream'
+import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -33,6 +32,7 @@ if (!token) {
 
 const api = `https://api.github.com/repos/${OWNER}/${REPO}`
 const auth = { Authorization: `token ${token}`, 'User-Agent': 'dsh-desktop', Accept: 'application/vnd.github+json' }
+let releaseId = null
 
 async function findOrCreateRelease() {
   const list = await fetch(`${api}/releases`, { headers: auth }).then((r) => r.json())
@@ -49,19 +49,44 @@ async function upload(uploadUrl, filePath) {
   const size = statSync(filePath).size
   const target = `${uploadUrl.replace(/\{\?.*\}$/, '')}?name=${encodeURIComponent(name)}`
   console.log(`uploading ${name} (${Math.round(size / 1024 / 1024)} MB) ...`)
-  const body = Readable.toWeb(createReadStream(filePath))
-  const response = await fetch(target, {
-    method: 'POST',
-    headers: { ...auth, 'Content-Type': 'application/octet-stream' },
-    body,
-    duplex: 'half',
-  })
-  if (!response.ok) throw new Error(`upload ${name} failed: ${response.status} ${await response.text()}`)
-  const asset = await response.json()
-  console.log(`  ok: ${asset.name}`)
+  // Read fully so undici sends an explicit Content-Length; GitHub rejects
+  // chunked bodies for release assets ("Bad Content-Length").
+  const data = readFileSync(filePath)
+  try {
+    const response = await fetch(target, {
+      method: 'POST',
+      headers: { ...auth, 'Content-Type': 'application/octet-stream', 'Content-Length': String(data.length) },
+      body: data,
+    })
+    if (!response.ok) throw new Error(`upload ${name} failed: ${response.status} ${await response.text()}`)
+    const asset = await response.json()
+    console.log(`  ok: ${asset.name}`)
+  } catch (error) {
+    // Large transfers can time out on the RESPONSE while the upload already
+    // completed (GitHub created the asset). Verify by size before failing.
+    const asset = await findAsset(name)
+    if (asset && asset.size === size) {
+      console.log(`  ok (uploaded, response timed out): ${asset.name}`)
+      return
+    }
+    throw error
+  }
+}
+
+async function findAsset(name) {
+  const perPage = 100
+  for (let page = 1; page <= 10; page++) {
+    const list = await fetch(`${api}/releases/${releaseId}/assets?page=${page}&per_page=${perPage}`, { headers: auth }).then((r) => r.json())
+    if (!Array.isArray(list)) return undefined
+    const found = list.find((asset) => asset.name === name)
+    if (found) return found
+    if (list.length < perPage) break
+  }
+  return undefined
 }
 
 const release = await findOrCreateRelease()
+releaseId = release.id
 console.log(`release: ${release.tag_name} (id ${release.id})`)
 for (const name of readdirSync(releaseDir)) {
   if (name === 'latest.yml' || name.endsWith('.exe.blockmap') || name.endsWith('.exe')) {
