@@ -1,0 +1,44 @@
+# DSH Desktop — Electron shell for the DeepSeek Harness web GUI.
+#
+# The shell never modifies the harness: it spawns `dsh web` (or attaches to a
+# running one) and opens a native window. All host/client plugin extension
+# capability is preserved because the window is a plain Chromium client.
+appId: com.deepseek-ai.dsh-desktop
+productName: DSH Desktop
+directories:
+  output: release
+files:
+  - main.mjs
+  - loading.html
+asar: true
+# The bundled dsh runtime (created by `npm run bundle:runtime`). The copy
+# anchor is the whole resources/ dir, NOT dsh-runtime/: electron-builder's
+# file filter unconditionally drops a TOP-LEVEL node_modules of the copy
+# root, and the runtime's node_modules is exactly that. With the anchor one
+# level up, dsh-runtime/node_modules is a nested node_modules and is copied.
+# Shipped unpacked on purpose: the harness is spawned as a real process tree
+# from disk, not read from the asar archive.
+extraResources:
+  - from: resources
+    to: .
+  - from: build/icon.png
+    to: app-icon.png
+win:
+  icon: build/icon.png
+  target:
+    - nsis
+  executableName: dsh-desktop
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: DSH Desktop
+# Update feed: electron-updater reads resources/app-update.yml at runtime.
+# The GitHub provider points the packaged app's auto-updater at GitHub
+# Releases of this repository; publishing a new release (tag + upload of the
+# installer and latest.yml, see README) makes it available to every install.
+publish:
+  provider: github
+  owner: otakutang
+  repo: Deepseek-harness-desktop

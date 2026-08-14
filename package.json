@@ -1,0 +1,22 @@
+{
+  "name": "dsh-desktop",
+  "version": "0.1.0",
+  "description": "Electron desktop shell for the DeepSeek Harness web GUI: spawns `dsh web` (or attaches to a running one) and opens a native window. The harness itself is untouched, so all host/client plugin extension capability is preserved.",
+  "type": "module",
+  "main": "main.mjs",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "bundle:runtime": "node scripts/bundle-runtime.mjs",
+    "pack": "npm run bundle:runtime && electron-builder --dir",
+    "dist": "npm run bundle:runtime && electron-builder --win nsis"
+  },
+  "devDependencies": {
+    "electron": "^43.4.0",
+    "electron-builder": "^26.15.3"
+  },
+  "dependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "electron-updater": "^6.8.9"
+  }
+}
