@@ -57,7 +57,13 @@ scripts/
 
 1. 改 `package.json` 的 `version`（如 `0.1.0` → `0.1.1`）。
 2. `npm run dist` 生成安装包与 `latest.yml`。
-3. 在 GitHub 上打同名 tag 并创建 Release，上传安装包、`latest.yml` 和 `.blockmap`（`node scripts/publish-update.mjs` 会把它们整理到 `update-staging/`）。
+3. 用脚本上传到 GitHub Release（自动创建同名 tag/release 并上传安装包、`latest.yml`、`.blockmap`）：
+
+   ```sh
+   GH_TOKEN=<你的 GitHub token> node scripts/upload-release.mjs
+   ```
+
+   > 大文件上传对网络敏感：若 `uploads.github.com` 传输被中断，换网络或开代理重试即可（脚本可重复执行）。也可以手动在 GitHub 网页的 Release 里拖拽上传这三个文件。
 
 已安装用户下次启动会自动发现并更新。
 
